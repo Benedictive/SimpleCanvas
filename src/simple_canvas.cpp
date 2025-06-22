@@ -7,14 +7,13 @@ SimpleCanvas::SimpleCanvas(unsigned int winHeight, unsigned int winWidth)
     : WINDOW_HEIGHT(winHeight), WINDOW_WIDTH(winWidth), screenPixels(WINDOW_HEIGHT * WINDOW_WIDTH)
 {
     InitSDL();
-    sdlDrawingSurface = SDL_CreateRGBSurface(0,WINDOW_WIDTH,WINDOW_HEIGHT,32,0xFF000000,0x00FF0000,0x0000FF00,0);
-	SDL_SetSurfaceBlendMode(sdlDrawingSurface, SDL_BLENDMODE_NONE);
+    sdlTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STREAMING, WINDOW_WIDTH, WINDOW_HEIGHT);
 }
 
 SimpleCanvas::~SimpleCanvas()
 {
-    if (sdlDrawingSurface) {
-        SDL_FreeSurface(sdlDrawingSurface);
+    if (sdlTexture) {
+        SDL_DestroyTexture(sdlTexture);
     }
 
     if(renderer) {
@@ -37,25 +36,17 @@ void SimpleCanvas::RegisterEventHandler(std::function<void(SDL_Event &)> userfun
 
 void SimpleCanvas::InitSDL()
 {
-    if(SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if(SDL_Init(SDL_INIT_VIDEO) == false) {
         std::string errorText = std::string("Unable to Init SDL: ") + SDL_GetError();
         throw std::runtime_error(errorText);
 	}
 
-	if(!SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1")) {
-		std::cout << "Unable to Init hinting: " << SDL_GetError() << std::endl;
-	}
-
-	if((window = SDL_CreateWindow(
-		"Simplescreendrawer",
-		SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_SHOWN)
-	) == NULL) {
+	if((window = SDL_CreateWindow("Simplescreendrawer",WINDOW_WIDTH, WINDOW_HEIGHT, 0)) == NULL) {
         std::string errorText = std::string("Unable to create SDL Window: ") + SDL_GetError();
 		throw std::runtime_error(errorText);
 	}
 
-	if((renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED)) == NULL) {
+	if((renderer = SDL_CreateRenderer(window, nullptr)) == NULL) {
         std::string errorText = std::string("Unable to create renderer") + SDL_GetError();
         throw std::runtime_error(errorText);
 	}
@@ -74,17 +65,13 @@ void SimpleCanvas::Render()
 {
     SDL_RenderClear(renderer);
 
-	int surfacePitch = sdlDrawingSurface->pitch;
-	SDL_memcpy(sdlDrawingSurface->pixels, screenPixels.data(), WINDOW_HEIGHT * surfacePitch);
+	void* texturePixelData;
+	int texturePitch;
+	SDL_LockTexture(sdlTexture, nullptr, &texturePixelData, &texturePitch);
+	SDL_memcpy(texturePixelData, screenPixels.data(), WINDOW_HEIGHT * texturePitch);
+	SDL_UnlockTexture(sdlTexture);
 
-	SDL_Texture* sdlTexture;
-	sdlTexture = SDL_CreateTextureFromSurface(renderer, sdlDrawingSurface);
-
-	int width, height;
-	SDL_QueryTexture(sdlTexture, NULL, NULL, &width, &height);
-	SDL_Rect destination = {0, 0, width, height};
-
-	SDL_RenderCopy(renderer, sdlTexture, NULL, &destination);
+	SDL_RenderTexture(renderer, sdlTexture, NULL, NULL);
 
 	SDL_RenderPresent(renderer);
 
@@ -96,10 +83,10 @@ void SimpleCanvas::Run(std::function<void(SimpleCanvas*)> userfunction)
     SDL_Event event;
 
 	while(running) {
-		while(SDL_PollEvent(&event) != 0) {
+		while(SDL_PollEvent(&event)) {
 			OnEvent(&event);
 
-			if(event.type == SDL_QUIT) {
+			if(event.type == SDL_EVENT_QUIT) {
 				running = false;
 			} else if (eventHandler.has_value()) {
 				(*eventHandler)(event);

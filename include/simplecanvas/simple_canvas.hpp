@@ -4,7 +4,7 @@
 #include <optional>
 #include <vector>
 
-#include "SDL.h"
+#include <SDL3/SDL.h>
 
 class SimpleCanvas
 {
@@ -17,7 +17,7 @@ private:
 
     SDL_Window* window = nullptr;
     SDL_Renderer* renderer = nullptr;
-    SDL_Surface* sdlDrawingSurface = nullptr;
+    SDL_Texture* sdlTexture = nullptr;
 
     std::vector<int> screenPixels;
 
@@ -27,6 +27,7 @@ public:
     SimpleCanvas(unsigned int winHeight, unsigned int winWidth);
     ~SimpleCanvas();
     void RegisterEventHandler(std::function<void(SDL_Event&)> userfunction);
+    //Must be run in the same thread as InitSDL
     void Run(std::function<void(SimpleCanvas*)> userfunction);
     std::vector<int>& GetPixelStore();
 
